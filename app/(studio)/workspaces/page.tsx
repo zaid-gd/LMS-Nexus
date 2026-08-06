@@ -2,52 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpDown, Plus, SlidersHorizontal } from "lucide-react";
-import StorageStatusCard from "@/components/shared/StorageStatusCard";
+import { ArrowUpDown, HardDrive, Plus, SlidersHorizontal } from "lucide-react";
 import WorkspaceLibraryCard from "@/components/workspaces/WorkspaceLibraryCard";
 import { Button } from "@/components/ui/button";
-import { getStorage, getStorageStatus } from "@/lib/storage";
+import { getStorage } from "@/lib/storage";
 import { getRoadmapStats } from "@/lib/workspace-stats";
-import type { Roadmap, StorageStatus } from "@/types";
+import type { Roadmap } from "@/types";
 
 type LibraryFilter = "all" | "in-progress" | "completed";
 type SortMode = "recent" | "title" | "completion";
 
 export default function WorkspacesPage() {
     const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
-    const [storageStatus, setStorageStatus] = useState<StorageStatus>({
-        mode: "local-only",
-        cloudAvailable: false,
-        email: null,
-    });
     const [filter, setFilter] = useState<LibraryFilter>("all");
     const [sortMode, setSortMode] = useState<SortMode>("recent");
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         const storage = getStorage();
-        let active = true;
 
         setMounted(true);
         setRoadmaps(storage.getRoadmaps());
-
-        void getStorageStatus().then((status) => {
-            if (active) {
-                setStorageStatus(status);
-            }
-        });
-
-        if (storage.syncFromCloud) {
-            void storage.syncFromCloud().then((synced) => {
-                if (active) {
-                    setRoadmaps(synced);
-                }
-            });
-        }
-
-        return () => {
-            active = false;
-        };
     }, []);
 
     const filteredRoadmaps = useMemo(() => {
@@ -111,11 +86,19 @@ export default function WorkspacesPage() {
             </header>
 
             <section className="section-space-compact">
-                <StorageStatusCard
-                    status={storageStatus}
-                    actionHref={storageStatus.mode === "synced-account" ? "/settings?tab=privacy" : "/auth?next=%2Fworkspaces"}
-                    actionLabel={storageStatus.mode === "synced-account" ? "Open privacy controls" : "Enable sync"}
-                />
+                <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-border bg-surface px-5 py-4">
+                    <div className="flex items-center gap-4">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--color-accent)]/10 text-[var(--color-accent)]">
+                            <HardDrive size={18} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-text-primary">Local-only storage</p>
+                            <p className="mt-1 text-sm leading-6 text-text-secondary">
+                                Everything stays in this browser. No account or cloud sync required.
+                            </p>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section className="space-y-8 py-2">

@@ -6,7 +6,7 @@ ZNS RoadMap Studio turns raw guides, playbooks, curricula, and notes into intera
 
 - AI-powered parsing for roadmaps, playbooks, tutorials, strategies, and other structured content
 - Interactive workspace with modules, milestones, notes, resources, videos, and progress tracking
-- Local-first persistence with optional Supabase sync
+- Local-first persistence — all data stays in your browser
 - Markdown, JSON, and PDF export
 - User-configurable AI provider, model, and API key
 
@@ -16,7 +16,6 @@ ZNS RoadMap Studio turns raw guides, playbooks, curricula, and notes into intera
 - React 19
 - TypeScript
 - Tailwind CSS v4
-- Supabase SSR client
 
 ## Getting Started
 
@@ -29,22 +28,17 @@ npm install
 2. Create `.env.local` with the variables you need:
 
 ```env
+# Access gate (password lock) - required
+GATE_PASSWORD=change-me-to-a-strong-password
+
+# Optional: your own AI provider keys (used server-side for shared studio AI)
 AI_PROVIDER=gemini
 AI_API_KEY=
 GEMINI_API_KEY=
 OPENAI_API_KEY=
 GROQ_API_KEY=
 OPENROUTER_API_KEY=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
-STRIPE_PRO_MONTHLY_PRICE_ID=
-STRIPE_PRO_ANNUAL_PRICE_ID=
-STRIPE_AGENCY_MONTHLY_PRICE_ID=
-STRIPE_AGENCY_ANNUAL_PRICE_ID=
 ```
 
 3. Start the app:
@@ -52,15 +46,6 @@ STRIPE_AGENCY_ANNUAL_PRICE_ID=
 ```bash
 npm run dev
 ```
-
-## Supabase Setup
-
-If you want the full backend enabled:
-
-- Run the SQL in [supabase/roadmaps.sql](./supabase/roadmaps.sql).
-- Set `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`.
-- Add Stripe env vars if you want subscription checkout and webhook support.
-- Keep `proxy.ts` enabled so Supabase SSR sessions stay in sync.
 
 ## Scripts
 
@@ -72,9 +57,9 @@ If you want the full backend enabled:
 
 ## Project Notes
 
-- Data is stored locally by default.
-- If a user configures Supabase, the app syncs saved workspaces to the `roadmaps` table.
+- All data is stored locally in the browser (workspaces, notes, progress, credits).
 - Custom AI keys are stored in browser storage and sent only to the selected provider when used.
+- Optional server-side AI keys can be set in `.env.local` for shared studio AI.
 
 ## Open Source
 

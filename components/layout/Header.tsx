@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X, Search } from "lucide-react";
-import AuthButton from "@/components/auth/AuthButton";
 import { Logo } from "@/components/shared/Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -66,10 +65,6 @@ export default function Header() {
                     <Link href="/create" passHref className="px-5 py-2 text-[12px] font-bold tracking-widest uppercase rounded bg-emerald-600 text-white shadow-lg hover:bg-emerald-500 hover:scale-[1.02] transition-all duration-300">
                         New Roadmap
                     </Link>
-                    <div className="relative flex items-center justify-center">
-                        <AuthButton />
-                        <span className="absolute -top-1 -right-1 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-zinc-950 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></span>
-                    </div>
                 </div>
 
                 <Button
@@ -108,7 +103,6 @@ export default function Header() {
                             );
                         })}
                         <div className="pt-4 flex gap-4 items-center">
-                            <AuthButton />
                             <Link href="/create" passHref className="px-4 py-2 text-[13px] font-semibold uppercase rounded-lg bg-emerald-500/20 border border-emerald-500/30 text-emerald-300">
                                 New Roadmap
                             </Link>

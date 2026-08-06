@@ -5,10 +5,6 @@ export const PLANS = {
         monthlyPrice: 0,
         annualPrice: 0,
         currency: "usd",
-        stripePriceId: {
-            monthly: null,
-            annual: null,
-        },
         limits: {
             workspaces: 3,
             aiGenerations: 10,
@@ -34,10 +30,6 @@ export const PLANS = {
         monthlyPrice: 12,
         annualPrice: 99,
         currency: "usd",
-        stripePriceId: {
-            monthly: process.env.STRIPE_PRO_MONTHLY_PRICE_ID!,
-            annual: process.env.STRIPE_PRO_ANNUAL_PRICE_ID!,
-        },
         limits: {
             workspaces: -1,
             aiGenerations: -1,
@@ -64,10 +56,6 @@ export const PLANS = {
         monthlyPrice: 59,
         annualPrice: 490,
         currency: "usd",
-        stripePriceId: {
-            monthly: process.env.STRIPE_AGENCY_MONTHLY_PRICE_ID!,
-            annual: process.env.STRIPE_AGENCY_ANNUAL_PRICE_ID!,
-        },
         limits: {
             workspaces: -1,
             aiGenerations: -1,
@@ -91,20 +79,4 @@ export type BillingInterval = "monthly" | "annual"
 
 export function getPaidPlanIds() {
     return ["pro", "agency"] as const
-}
-
-export function getPlanFromPriceId(priceId: string | null | undefined) {
-    if (!priceId) return null
-
-    for (const planId of getPaidPlanIds()) {
-        const plan = PLANS[planId]
-        if (plan.stripePriceId.monthly === priceId) {
-            return { planId, interval: "monthly" as const }
-        }
-        if (plan.stripePriceId.annual === priceId) {
-            return { planId, interval: "annual" as const }
-        }
-    }
-
-    return null
 }

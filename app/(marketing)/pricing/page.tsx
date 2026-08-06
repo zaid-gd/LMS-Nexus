@@ -4,35 +4,34 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import FaqSchema from "@/components/seo/FaqSchema"
 import { ArrowRight, CheckCircle2, HelpCircle, ShieldCheck, Sparkles, X } from "lucide-react"
-import CheckoutButton from "@/components/payments/CheckoutButton"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { PLANS, type BillingInterval, type PlanId } from "@/lib/plans"
 
 const FAQS = [
     {
-        question: "Which payment methods are accepted?",
-        answer: "All major credit and debit cards are supported, including Visa, Mastercard, and Amex. International cards are supported as well.",
+        question: "Is there a free plan?",
+        answer: "Yes. The Free plan is permanently free: 3 workspaces and 10 shared AI generations per month.",
+    },
+    {
+        question: "What happens when I hit the free AI limit?",
+        answer: "Add your own provider key in Settings to skip credit deductions entirely, or wait for the monthly reset.",
+    },
+    {
+        question: "What happens if I exceed the workspace limit?",
+        answer: "Your existing workspaces stay available and can still be viewed. You can create new ones once you are back under the limit.",
+    },
+    {
+        question: "Are Pro or Agency plans available?",
+        answer: "They are on the roadmap. The studio currently runs entirely in your browser with no account or billing required.",
     },
     {
         question: "Can I cancel anytime?",
-        answer: "Yes. Cancel from Settings and you keep access until the end of the current billing period.",
+        answer: "There is nothing to cancel — the studio has no subscriptions or recurring charges.",
     },
     {
-        question: "What happens to my workspaces if I downgrade?",
-        answer: "Your existing workspaces stay available. If you are over the free limit, you can still view them but cannot create new ones until you are back under the limit or upgrade again.",
-    },
-    {
-        question: "Is there a free trial?",
-        answer: "The Free plan is permanently free and includes 3 workspaces.",
-    },
-    {
-        question: "Do you offer refunds?",
-        answer: "Yes. Contact support within 7 days and we will process a full refund.",
-    },
-    {
-        question: "Can I switch between monthly and annual?",
-        answer: "Yes. You can change billing cadence from Settings at any time through Stripe Customer Portal.",
+        question: "Is my data stored in the cloud?",
+        answer: "No. All roadmaps and preferences stay in your browser. No cloud sync or account needed.",
     },
 ]
 
@@ -131,11 +130,9 @@ function PlanCard({
                     </Button>
                 ) : (
                     <div className="w-full">
-                        <CheckoutButton
-                            planId={planId}
-                            interval={interval}
-                            label={planId === "pro" ? "Upgrade to Pro" : "Upgrade to Agency"}
-                        />
+                        <Button disabled size="lg" className="w-full">
+                            Coming soon
+                        </Button>
                     </div>
                 )}
             </CardFooter>
@@ -154,13 +151,13 @@ export default function PricingPage() {
                     <div className="mx-auto max-w-3xl text-center">
                         <div className="mb-5 inline-flex items-center gap-2 border border-border px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-text-secondary">
                             <Sparkles size={14} className="text-text-primary" />
-                            Billing for creators, teams, and agencies
+                            Pricing for creators, teams, and agencies
                         </div>
                         <h1 className="text-5xl font-display leading-none text-text-primary sm:text-6xl">
                             Simple, Transparent Pricing
                         </h1>
                         <p className="mx-auto mt-5 max-w-2xl text-base text-text-secondary">
-                            Start free, scale when the studio becomes mission-critical, and manage billing in Stripe without hidden add-ons or platform lock-in.
+                            Start free today. Pro and Agency plans are on the roadmap — no account, no cloud, no hidden fees.
                         </p>
                     </div>
 
@@ -218,7 +215,7 @@ export default function PricingPage() {
 
                     <div className="mt-8 flex items-center gap-3 border-y border-border p-5 text-sm text-text-secondary">
                         <ShieldCheck size={18} className="shrink-0 text-text-primary" />
-                        Stripe Checkout handles card entry, SCA, and international card support. Your app only receives Stripe-managed session and subscription state.
+                        Local-first by design. Roadmaps and preferences stay in your browser — no cloud, no account, no hidden fees.
                     </div>
                 </section>
         </div>

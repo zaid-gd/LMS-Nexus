@@ -1,149 +1,9 @@
 import type { Roadmap, StorageProvider, StorageStatus } from "@/types";
-import { createClient as createSupabaseClient } from "@/utils/supabase/client";
-import { isSupabaseConfigured } from "@/utils/supabase/config";
 
 export const ROADMAPS_KEY = "zns:v1:roadmaps";
 const LEGACY_ROADMAPS_KEY = "zns_workspaces";
 
-type SupabaseRoadmapRow = {
-    id: string;
-    user_id: string;
-    roadmap: Roadmap;
-    updated_at?: string | null;
-};
-
-class SupabaseRoadmapClient {
-    private async getAuthenticatedContext() {
-        const supabase = createSupabaseClient();
-        const {
-            data: { user },
-            error,
-        } = await supabase.auth.getUser();
-
-        if (error || !user) return null;
-
-        return {
-            supabase,
-            userId: user.id,
-        };
-    }
-
-    async fetchRoadmaps(): Promise<Roadmap[] | null> {
-        try {
-            const context = await this.getAuthenticatedContext();
-            if (!context) return null;
-
-            const { data, error } = await context.supabase
-                .from("roadmaps")
-                .select("id, roadmap, updated_at")
-                .eq("user_id", context.userId)
-                .order("updated_at", { ascending: false });
-
-            if (error || !Array.isArray(data)) return null;
-
-            return data
-                .map((row) => (row as SupabaseRoadmapRow).roadmap)
-                .filter((value): value is Roadmap => Boolean(value?.id));
-        } catch {
-            return null;
-        }
-    }
-
-    async upsertRoadmap(roadmap: Roadmap): Promise<void> {
-        try {
-            const context = await this.getAuthenticatedContext();
-            if (!context) return;
-
-            await context.supabase.from("roadmaps").upsert(
-                {
-                    id: roadmap.id,
-                    user_id: context.userId,
-                    roadmap,
-                    updated_at: roadmap.updatedAt ?? new Date().toISOString(),
-                },
-                { onConflict: "id" },
-            );
-        } catch {
-            // Best effort cloud sync; local remains source of truth on failure.
-        }
-    }
-
-    async upsertRoadmaps(roadmaps: Roadmap[]): Promise<void> {
-        if (roadmaps.length === 0) return;
-
-        try {
-            const context = await this.getAuthenticatedContext();
-            if (!context) return;
-
-            await context.supabase.from("roadmaps").upsert(
-                roadmaps.map((roadmap) => ({
-                    id: roadmap.id,
-                    user_id: context.userId,
-                    roadmap,
-                    updated_at: roadmap.updatedAt ?? new Date().toISOString(),
-                })),
-                { onConflict: "id" },
-            );
-        } catch {
-            // Best effort cloud sync; local remains source of truth on failure.
-        }
-    }
-
-    async deleteRoadmap(id: string): Promise<void> {
-        try {
-            const context = await this.getAuthenticatedContext();
-            if (!context) return;
-
-            await context.supabase.from("roadmaps").delete().eq("user_id", context.userId).eq("id", id);
-        } catch {
-            // Best effort cloud sync; local remains source of truth on failure.
-        }
-    }
-
-    async deleteAllRoadmaps(): Promise<void> {
-        try {
-            const context = await this.getAuthenticatedContext();
-            if (!context) return;
-
-            await context.supabase.from("roadmaps").delete().eq("user_id", context.userId);
-        } catch {
-            // Best effort cloud sync; local remains source of truth on failure.
-        }
-    }
-}
-
-function getTimestamp(value?: string): number {
-    if (!value) return 0;
-    const ms = new Date(value).getTime();
-    return Number.isFinite(ms) ? ms : 0;
-}
-
-function mergeRoadmaps(local: Roadmap[], cloud: Roadmap[]): Roadmap[] {
-    const merged = new Map<string, Roadmap>();
-
-    for (const roadmap of [...local, ...cloud]) {
-        const existing = merged.get(roadmap.id);
-        if (!existing) {
-            merged.set(roadmap.id, roadmap);
-            continue;
-        }
-
-        const existingTs = getTimestamp(existing.updatedAt);
-        const incomingTs = getTimestamp(roadmap.updatedAt);
-        if (incomingTs >= existingTs) merged.set(roadmap.id, roadmap);
-    }
-
-    return [...merged.values()].sort((a, b) => getTimestamp(b.updatedAt) - getTimestamp(a.updatedAt));
-}
-
-function hasSupabaseEnv(): boolean {
-    if (typeof window === "undefined") return false;
-    return isSupabaseConfigured();
-}
-
 class LocalStorageProvider implements StorageProvider {
-    private cloudClient: SupabaseRoadmapClient | null = hasSupabaseEnv() ? new SupabaseRoadmapClient() : null;
-
     private readStore(): Roadmap[] {
         try {
             const raw = localStorage.getItem(ROADMAPS_KEY);
@@ -190,13 +50,11 @@ class LocalStorageProvider implements StorageProvider {
         }
 
         this.writeStore(all);
-        void this.cloudClient?.upsertRoadmap(roadmap);
     }
 
     deleteRoadmap(id: string): void {
         const all = this.readStore().filter((r) => r.id !== id);
         this.writeStore(all);
-        void this.cloudClient?.deleteRoadmap(id);
     }
 
     updateRoadmap(id: string, updates: Partial<Roadmap>): void {
@@ -207,7 +65,6 @@ class LocalStorageProvider implements StorageProvider {
         const updated = { ...all[idx], ...updates, updatedAt: new Date().toISOString() };
         all[idx] = updated;
         this.writeStore(all);
-        void this.cloudClient?.upsertRoadmap(updated);
     }
 
     clearRoadmaps(): void {
@@ -218,24 +75,6 @@ class LocalStorageProvider implements StorageProvider {
         });
         localStorage.removeItem(ROADMAPS_KEY);
         localStorage.removeItem(LEGACY_ROADMAPS_KEY);
-        void this.cloudClient?.deleteAllRoadmaps();
-    }
-
-    isCloudEnabled(): boolean {
-        return Boolean(this.cloudClient);
-    }
-
-    async syncFromCloud(): Promise<Roadmap[]> {
-        const local = this.readStore();
-        if (!this.cloudClient) return local;
-
-        const cloud = await this.cloudClient.fetchRoadmaps();
-        if (!cloud) return local;
-
-        const merged = mergeRoadmaps(local, cloud);
-        this.writeStore(merged);
-        void this.cloudClient.upsertRoadmaps(merged);
-        return merged;
     }
 }
 
@@ -251,46 +90,9 @@ export function getRoadmapsBackupJson(): string {
 }
 
 export async function getStorageStatus(): Promise<StorageStatus> {
-    if (!isSupabaseConfigured()) {
-        return {
-            mode: "supabase-unavailable",
-            cloudAvailable: false,
-            email: null,
-        };
-    }
-
-    if (typeof window === "undefined") {
-        return {
-            mode: "local-only",
-            cloudAvailable: true,
-            email: null,
-        };
-    }
-
-    try {
-        const supabase = createSupabaseClient();
-        const {
-            data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-            return {
-                mode: "local-only",
-                cloudAvailable: true,
-                email: null,
-            };
-        }
-
-        return {
-            mode: "synced-account",
-            cloudAvailable: true,
-            email: user.email ?? null,
-        };
-    } catch {
-        return {
-            mode: "local-only",
-            cloudAvailable: true,
-            email: null,
-        };
-    }
+    return {
+        mode: "local-only",
+        cloudAvailable: false,
+        email: null,
+    };
 }

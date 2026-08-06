@@ -1,27 +1,23 @@
-import { createServerClient } from "@/utils/supabase/server";
+import { LOCAL_USER_ID } from "@/lib/server/store";
 
-export async function getServerAuthContext() {
-    const supabase = await createServerClient();
-    const {
-        data: { user },
-        error,
-    } = await supabase.auth.getUser();
+export type ServerUser = {
+    id: string;
+    email: string;
+};
 
+export type ServerAuthContext = {
+    user: ServerUser;
+};
+
+export async function getServerAuthContext(): Promise<ServerAuthContext> {
     return {
-        supabase,
-        user: error ? null : user,
+        user: {
+            id: LOCAL_USER_ID,
+            email: "local@localhost",
+        },
     };
 }
 
-export async function requireServerUser() {
-    const { supabase, user } = await getServerAuthContext();
-
-    if (!user) {
-        throw new Error("Authentication required");
-    }
-
-    return {
-        supabase,
-        user,
-    };
+export async function requireServerUser(): Promise<ServerAuthContext> {
+    return getServerAuthContext();
 }

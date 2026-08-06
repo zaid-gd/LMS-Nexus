@@ -279,10 +279,6 @@ export default function AnalyticsPage() {
         setMounted(true);
         setRoadmaps(storage.getRoadmaps());
 
-        if (storage.syncFromCloud) {
-            void storage.syncFromCloud().then((synced) => setRoadmaps(synced));
-        }
-
         // Load streak
         try {
             const raw = localStorage.getItem("zns_learning_streak");

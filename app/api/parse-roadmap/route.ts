@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { deductCredits } from "@/lib/server/credits";
 import { generateStructuredJson, testAiConnection } from "@/lib/server/ai";
 import { getAiProviderInvalidKeyMessage, isAiProvider } from "@/lib/ai-config";
-import { createServerClient } from "@/utils/supabase/server";
-import { isSupabaseConfigured } from "@/utils/supabase/config";
 import { truncateForAi } from "@/lib/openai";
 
 const SYSTEM_PROMPT = `You are an advanced Context-Aware AI that transforms raw content into a structured, highly organized digital workspace.
@@ -397,11 +395,6 @@ export async function POST(req: NextRequest) {
         const body = await req.json();
         const { content, mode, title, goal, difficulty, estimatedDuration, userApiKey, userProvider, userModel, testOnly } = body;
 
-        const supabase = isSupabaseConfigured() ? await createServerClient() : null;
-        const {
-            data: { user },
-        } = supabase ? await supabase.auth.getUser() : { data: { user: null } };
-
         if (!content || typeof content !== "string") {
             return NextResponse.json(
                 { success: false, error: "Content is required" },
@@ -413,17 +406,6 @@ export async function POST(req: NextRequest) {
         const sanitizedProvider = isAiProvider(userProvider) ? userProvider : "gemini";
         const sanitizedModel = typeof userModel === "string" && userModel.trim().length > 0 ? userModel.trim() : undefined;
         const useUserKey = Boolean(sanitizedUserKey);
-
-        if (!user && !useUserKey) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    error: "authentication_required",
-                    message: "Sign in to use shared studio AI, or add your own provider key.",
-                },
-                { status: 401 }
-            );
-        }
 
         if (testOnly) {
             try {
@@ -455,10 +437,10 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        if (user) {
+        if (!useUserKey) {
             const creditResult = await deductCredits({
                 kind: "workspace_generation",
-                userApiKey: useUserKey ? sanitizedUserKey : undefined,
+                userApiKey: undefined,
                 metadata: {
                     mode: mode === "intern" ? "intern" : "general",
                 },

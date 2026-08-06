@@ -1,6 +1,16 @@
 import type { PrivacySettings } from "@/types";
-import { requireServerUser } from "@/lib/server/auth";
-import { createServiceRoleClient } from "@/utils/supabase/server";
+import { LOCAL_USER_ID } from "@/lib/server/store";
+import {
+    getStoredLedger,
+    getStoredPrivacySettings,
+    listStoredCoachingSessions,
+    listStoredProgressSnapshots,
+    listStoredRoadmaps,
+    listStoredTransactions,
+    resetServerStore,
+    setStoredPrivacySettings,
+    unpublishAllStoredRoadmaps,
+} from "@/lib/server/store";
 
 const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
     anonymousAnalytics: false,
@@ -8,100 +18,38 @@ const DEFAULT_PRIVACY_SETTINGS: PrivacySettings = {
 };
 
 export async function getPrivacySettings(): Promise<PrivacySettings> {
-    const { supabase, user } = await requireServerUser();
-    const { data, error } = await supabase
-        .from("user_privacy_settings")
-        .select("anonymous_analytics, allow_public_gallery")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-    if (error) throw error;
-    if (!data) return DEFAULT_PRIVACY_SETTINGS;
-
-    return {
-        anonymousAnalytics: Boolean(data.anonymous_analytics),
-        allowPublicGallery: Boolean(data.allow_public_gallery),
-    };
+    return getStoredPrivacySettings() ?? DEFAULT_PRIVACY_SETTINGS;
 }
 
 export async function updatePrivacySettings(settings: PrivacySettings): Promise<PrivacySettings> {
-    const { supabase, user } = await requireServerUser();
-    const { error } = await supabase.from("user_privacy_settings").upsert(
-        {
-            user_id: user.id,
-            anonymous_analytics: settings.anonymousAnalytics,
-            allow_public_gallery: settings.allowPublicGallery,
-            updated_at: new Date().toISOString(),
-        },
-        { onConflict: "user_id" },
-    );
-
-    if (error) throw error;
+    setStoredPrivacySettings(settings);
 
     if (!settings.allowPublicGallery) {
-        await supabase.from("roadmaps").update({ is_public: false }).eq("user_id", user.id);
+        unpublishAllStoredRoadmaps();
     }
 
     return settings;
 }
 
 export async function exportUserData() {
-    const { supabase, user } = await requireServerUser();
-
-    const [
-        { data: roadmaps },
-        { data: srsItems },
-        { data: creditLedger },
-        { data: creditTransactions },
-        { data: progressSnapshots },
-        { data: coachingSessions },
-        { data: privacySettings },
-        { data: notes },
-    ] = await Promise.all([
-        supabase.from("roadmaps").select("*").eq("user_id", user.id),
-        supabase.from("srs_items").select("*").eq("user_id", user.id),
-        supabase.from("credit_ledgers").select("*").eq("user_id", user.id).maybeSingle(),
-        supabase.from("credit_transactions").select("*").eq("user_id", user.id),
-        supabase.from("progress_snapshots").select("*").eq("user_id", user.id),
-        supabase.from("coaching_sessions").select("*").eq("user_id", user.id),
-        supabase.from("user_privacy_settings").select("*").eq("user_id", user.id).maybeSingle(),
-        supabase.from("notes").select("*").eq("user_id", user.id),
-    ]);
+    const roadmaps = listStoredRoadmaps();
+    const privacySettings = getStoredPrivacySettings();
 
     return {
         exportedAt: new Date().toISOString(),
-        userId: user.id,
-        roadmaps: roadmaps ?? [],
-        srsItems: srsItems ?? [],
-        creditLedger: creditLedger ?? null,
-        creditTransactions: creditTransactions ?? [],
-        progressSnapshots: progressSnapshots ?? [],
-        coachingSessions: coachingSessions ?? [],
-        privacySettings: privacySettings ?? null,
-        notes: notes ?? [],
+        userId: LOCAL_USER_ID,
+        roadmaps,
+        srsItems: [],
+        creditLedger: getStoredLedger(LOCAL_USER_ID) ?? null,
+        creditTransactions: listStoredTransactions(Number.MAX_SAFE_INTEGER),
+        progressSnapshots: listStoredProgressSnapshots(),
+        coachingSessions: listStoredCoachingSessions(),
+        privacySettings,
+        notes: [],
     };
 }
 
 export async function deleteAllUserData() {
-    const { user } = await requireServerUser();
-    const supabase = createServiceRoleClient();
-
-    const tables = [
-        "coaching_sessions",
-        "progress_snapshots",
-        "credit_transactions",
-        "credit_ledgers",
-        "srs_items",
-        "user_privacy_settings",
-        "notes",
-        "ai_generation_events",
-        "roadmaps",
-    ] as const;
-
-    for (const table of tables) {
-        const { error } = await supabase.from(table).delete().eq("user_id", user.id);
-        if (error) throw error;
-    }
-
+    resetServerStore();
     return { success: true };
 }

@@ -1,4 +1,4 @@
-import { PLANS, type BillingInterval, type PlanId, getPlanFromPriceId } from "@/lib/plans"
+import { PLANS, type BillingInterval, type PlanId } from "@/lib/plans"
 
 export type SubscriptionStatus =
     | "active"
@@ -13,9 +13,6 @@ export type SubscriptionStatus =
 export interface SubscriptionRecord {
     id?: string
     user_id: string
-    stripe_customer_id: string | null
-    stripe_subscription_id: string | null
-    stripe_price_id: string | null
     plan_id: string | null
     billing_interval: BillingInterval | null
     status: string | null
@@ -47,19 +44,4 @@ export function isPaidPlan(planId: string | null | undefined) {
 export function getPlanName(planId: string | null | undefined) {
     if (!planId || !(planId in PLANS)) return PLANS.free.name
     return PLANS[planId as PlanId].name
-}
-
-export function inferPlanFromPriceId(priceId: string | null | undefined) {
-    const lookup = getPlanFromPriceId(priceId)
-    if (!lookup) {
-        return {
-            planId: "free" as PlanId,
-            billingInterval: "monthly" as BillingInterval,
-        }
-    }
-
-    return {
-        planId: lookup.planId,
-        billingInterval: lookup.interval,
-    }
 }

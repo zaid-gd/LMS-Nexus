@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, useCallback, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronDown, ChevronUp, FileUp, Loader2, Wand2, ArrowRight, ArrowLeft } from "lucide-react";
-import UpgradeModal from "@/components/payments/UpgradeModal";
+import { ChevronDown, ChevronUp, FileUp, KeyRound, Loader2, Wand2, ArrowRight, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -316,7 +316,22 @@ function CreatePageContent() {
                 )}
             </div>
 
-            {upgradeMessage && <UpgradeModal message={upgradeMessage} onClose={() => setUpgradeMessage("")} />}
+            {upgradeMessage && (
+                <div className="fixed inset-x-0 bottom-0 z-[80] flex justify-center p-4 sm:p-6">
+                    <div className="w-full max-w-lg rounded-2xl border border-border bg-surface p-5 shadow-2xl">
+                        <p className="text-sm leading-6 text-text-primary">{upgradeMessage}</p>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                            <Link href="/settings?tab=ai" className="button-primary">
+                                <KeyRound size={14} />
+                                Add your own key
+                            </Link>
+                            <button type="button" onClick={() => setUpgradeMessage("")} className="button-secondary">
+                                Dismiss
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

@@ -113,21 +113,6 @@ export function useRoadmap(id?: string, isSession: boolean = false) {
         }
     }, [id, isSession, storage]);
 
-    useEffect(() => {
-        if (!storage.syncFromCloud) return;
-
-        let active = true;
-        void storage.syncFromCloud().then(() => {
-            if (!active) return;
-            setRoadmaps(storage.getRoadmaps());
-            if (id) setRoadmap(storage.getRoadmap(id));
-        });
-
-        return () => {
-            active = false;
-        };
-    }, [id, storage]);
-
     return {
         roadmap,
         roadmaps,

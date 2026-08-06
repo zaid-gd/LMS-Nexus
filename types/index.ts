@@ -246,7 +246,7 @@ export interface CustomItem {
     metadata?: Record<string, string>;
 }
 
-export type StorageMode = "local-only" | "synced-account" | "supabase-unavailable";
+export type StorageMode = "local-only";
 
 export interface StorageStatus {
     mode: StorageMode;
@@ -329,8 +329,6 @@ export interface StorageProvider {
     deleteRoadmap(id: string): void;
     updateRoadmap(id: string, updates: Partial<Roadmap>): void;
     clearRoadmaps(): void;
-    syncFromCloud?(): Promise<Roadmap[]>;
-    isCloudEnabled?(): boolean;
 }
 
 /* API types */

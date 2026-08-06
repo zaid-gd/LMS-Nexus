@@ -14,19 +14,15 @@ import {
     Info,
     KeyRound,
     Loader2,
-    LogOut,
     Trash2,
-    UserRound,
 } from "lucide-react";
-import ManageBillingButton from "@/components/payments/ManageBillingButton";
-import StorageStatusCard from "@/components/shared/StorageStatusCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { applyAccentTheme, applyVisualDensity } from "@/lib/accent-theme";
 import { AI_PROVIDER_OPTIONS, getAiProviderLabel, PROVIDER_KEY_LABELS, PROVIDER_KEY_PLACEHOLDERS, PROVIDER_MODEL_PRESETS } from "@/lib/ai-config";
-import { getEffectivePlanId, getPlanName, isPaidPlan, type SubscriptionRecord } from "@/lib/billing";
+import { getEffectivePlanId, getPlanName } from "@/lib/billing";
 import {
     clearUserConfig,
     DEFAULT_CONFIG,
@@ -38,8 +34,6 @@ import {
 } from "@/lib/userConfig";
 import { getRoadmapsBackupJson, getStorage, getStorageStatus } from "@/lib/storage";
 import type { CreditStatus, CreditTransaction, PrivacySettings, StorageStatus } from "@/types";
-import { createClient as createSupabaseClient } from "@/utils/supabase/client";
-import { isSupabaseConfigured } from "@/utils/supabase/config";
 
 const ACCENT_COLORS = ["#4F7CFF", "#C69B5A", "#2FA67D", "#D96868", "#7C67FF", "#D9A441", "#0EA5E9", "#EC4899"];
 
@@ -92,13 +86,6 @@ function getStatusBadgeClasses(status: string | null | undefined) {
         return "border-red-200 bg-red-50 text-red-700";
     }
     return "border-border bg-surface text-text-secondary";
-}
-
-function getCreditTone(status: CreditStatus | null) {
-    if (!status) return "border-border bg-surface";
-    if (status.remaining <= 25) return "border-red-200 bg-red-50";
-    if (status.remaining <= 100) return "border-amber-200 bg-amber-50";
-    return "border-emerald-200 bg-emerald-50";
 }
 
 function getTransactionLabel(kind: CreditTransaction["kind"]) {
@@ -206,13 +193,6 @@ function SettingsContent() {
         cloudAvailable: false,
         email: null,
     });
-    const [userEmail, setUserEmail] = useState<string | null>(null);
-    const [subscription, setSubscription] = useState<SubscriptionRecord | null>(null);
-    const [privacySettings, setPrivacySettings] = useState<PrivacySettings | null>(null);
-    const [privacyDraft, setPrivacyDraft] = useState<PrivacySettings>({
-        anonymousAnalytics: false,
-        allowPublicGallery: false,
-    });
     const [creditStatus, setCreditStatus] = useState<CreditStatus | null>(null);
     const [transactions, setTransactions] = useState<CreditTransaction[]>([]);
     const [loading, setLoading] = useState(true);
@@ -221,12 +201,9 @@ function SettingsContent() {
     const [testingKey, setTestingKey] = useState(false);
     const [testMessage, setTestMessage] = useState<string | null>(null);
     const [testTone, setTestTone] = useState<"success" | "error" | "neutral">("neutral");
-    const [privacySaving, setPrivacySaving] = useState(false);
     const [exporting, setExporting] = useState(false);
     const [deleting, setDeleting] = useState(false);
-    const [deleteConfirmation, setDeleteConfirmation] = useState("");
     const [toast, setToast] = useState<ToastState>(null);
-    const [isSigningOut, startSignOutTransition] = useTransition();
 
     useEffect(() => {
         setConfig(getUserConfig());
@@ -241,31 +218,12 @@ function SettingsContent() {
     }, [config.visualDensity]);
 
     useEffect(() => {
-        if (privacySettings) {
-            setPrivacyDraft(privacySettings);
-            return;
-        }
-
-        setPrivacyDraft({
-            anonymousAnalytics: false,
-            allowPublicGallery: false,
-        });
-    }, [privacySettings]);
-
-    useEffect(() => {
         const tab = searchParams.get("tab");
-        const payment = searchParams.get("payment");
 
         if (tab === "billing" || tab === "privacy" || tab === "ai") {
             setActiveCategory(tab);
         } else if (tab === "account" || tab === "appearance" || tab === "general") {
             setActiveCategory("general");
-        }
-
-        if (payment === "success") {
-            setToast({ tone: "success", message: "Billing updated. Your subscription is active." });
-        } else if (payment === "cancelled") {
-            setToast({ tone: "neutral", message: "Checkout was cancelled. Your current plan has not changed." });
         }
     }, [searchParams]);
 
@@ -279,50 +237,10 @@ function SettingsContent() {
             if (!active) return;
 
             setStorageStatus(nextStorageStatus);
-            setUserEmail(nextStorageStatus.email ?? null);
-
-            if (!isSupabaseConfigured()) {
-                setSubscription(null);
-                setPrivacySettings(null);
-                setCreditStatus(null);
-                setTransactions([]);
-                setLoading(false);
-                return;
-            }
 
             try {
-                const supabase = createSupabaseClient();
-                const {
-                    data: { user },
-                } = await supabase.auth.getUser();
-
+                const creditsRes = await fetch("/api/credits/status");
                 if (!active) return;
-
-                if (!user) {
-                    setSubscription(null);
-                    setPrivacySettings(null);
-                    setCreditStatus(null);
-                    setTransactions([]);
-                    setLoading(false);
-                    return;
-                }
-
-                setUserEmail(user.email ?? null);
-
-                const [{ data: subscriptionRow }, privacyRes, creditsRes] = await Promise.all([
-                    supabase.from("subscriptions").select("*").eq("user_id", user.id).maybeSingle(),
-                    fetch("/api/settings/privacy"),
-                    fetch("/api/credits/status"),
-                ]);
-
-                if (!active) return;
-
-                setSubscription((subscriptionRow as SubscriptionRecord | null) ?? null);
-
-                if (privacyRes.ok) {
-                    const privacyJson = (await privacyRes.json()) as { success: boolean; settings?: PrivacySettings };
-                    setPrivacySettings(privacyJson.settings ?? null);
-                }
 
                 if (creditsRes.ok) {
                     const creditsJson = (await creditsRes.json()) as {
@@ -347,10 +265,7 @@ function SettingsContent() {
         };
     }, []);
 
-    const effectivePlanId = getEffectivePlanId(subscription);
-    const paidPlan = isPaidPlan(effectivePlanId);
-    const renewalDate = formatDate(subscription?.current_period_end);
-    const deleteRequiresConfirmation = storageStatus.mode === "synced-account";
+    const effectivePlanId = getEffectivePlanId(null);
 
     function switchCategory(next: Category) {
         setActiveCategory(next);
@@ -360,15 +275,8 @@ function SettingsContent() {
     }
 
     async function refreshRemoteSettings() {
-        if (!isSupabaseConfigured()) return;
-
         try {
-            const [privacyRes, creditsRes] = await Promise.all([fetch("/api/settings/privacy"), fetch("/api/credits/status")]);
-
-            if (privacyRes.ok) {
-                const privacyJson = (await privacyRes.json()) as { success: boolean; settings?: PrivacySettings };
-                setPrivacySettings(privacyJson.settings ?? null);
-            }
+            const creditsRes = await fetch("/api/credits/status");
 
             if (creditsRes.ok) {
                 const creditsJson = (await creditsRes.json()) as {
@@ -439,61 +347,10 @@ function SettingsContent() {
         }
     }
 
-    async function updatePrivacy(next: Partial<PrivacySettings>) {
-        if (!userEmail) {
-            setToast({ tone: "neutral", message: "Sign in first to store privacy preferences on your account." });
-            return;
-        }
-
-        const merged = {
-            anonymousAnalytics: next.anonymousAnalytics ?? privacySettings?.anonymousAnalytics ?? false,
-            allowPublicGallery: next.allowPublicGallery ?? privacySettings?.allowPublicGallery ?? false,
-        };
-
-        setPrivacySaving(true);
-
-        try {
-            const res = await fetch("/api/settings/privacy", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(merged),
-            });
-
-            const payload = (await res.json()) as { success: boolean; settings?: PrivacySettings; error?: string };
-            if (!res.ok || !payload.success || !payload.settings) {
-                throw new Error(payload.error || "Failed to update privacy settings");
-            }
-
-            setPrivacySettings(payload.settings);
-            setToast({ tone: "success", message: "Privacy settings updated." });
-        } catch (error) {
-            console.error("Privacy update error:", error);
-            setToast({ tone: "error", message: "Privacy settings could not be updated." });
-        } finally {
-            setPrivacySaving(false);
-        }
-    }
-
-    async function handleSavePrivacy() {
-        await updatePrivacy(privacyDraft);
-    }
-
     async function handleExportData() {
         setExporting(true);
 
         try {
-            if (userEmail) {
-                const res = await fetch("/api/settings/export");
-                const payload = (await res.json()) as { success: boolean; data?: unknown; error?: string };
-                if (!res.ok || !payload.success || payload.data === undefined) {
-                    throw new Error(payload.error || "Failed to export account data");
-                }
-
-                downloadJsonFile(`zns-studio-export-${new Date().toISOString().slice(0, 10)}.json`, payload.data);
-                setToast({ tone: "success", message: "Account export downloaded." });
-                return;
-            }
-
             downloadJsonFile(`zns-studio-local-export-${new Date().toISOString().slice(0, 10)}.json`, {
                 exportedAt: new Date().toISOString(),
                 storageMode: storageStatus.mode,
@@ -510,39 +367,15 @@ function SettingsContent() {
     }
 
     async function handleDeleteEverything() {
-        if (deleteRequiresConfirmation && deleteConfirmation !== "DELETE") {
-            setToast({ tone: "error", message: 'Type DELETE to confirm account data removal.' });
-            return;
-        }
-
         setDeleting(true);
 
         try {
-            if (userEmail) {
-                const res = await fetch("/api/settings/delete", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ confirmation: "DELETE" }),
-                });
-                const payload = (await res.json()) as { success?: boolean; error?: string };
-                if (!res.ok || !payload.success) {
-                    throw new Error(payload.error || "Failed to delete account data");
-                }
-            }
-
             getStorage().clearRoadmaps();
             clearUserConfig();
             setConfig(DEFAULT_CONFIG);
-            setDeleteConfirmation("");
-            setPrivacySettings(userEmail ? { anonymousAnalytics: false, allowPublicGallery: false } : null);
             setCreditStatus(null);
             setTransactions([]);
-            setToast({
-                tone: "success",
-                message: userEmail
-                    ? "Account-scoped data was removed. Local browser state was cleared as well."
-                    : "Local browser data was cleared from this device.",
-            });
+            setToast({ tone: "success", message: "Local browser data was cleared from this device." });
             window.setTimeout(() => window.location.reload(), 350);
         } catch (error) {
             console.error("Delete error:", error);
@@ -552,27 +385,11 @@ function SettingsContent() {
         }
     }
 
-    function handleSignOut() {
-        startSignOutTransition(() => {
-            void (async () => {
-                try {
-                    const supabase = createSupabaseClient();
-                    await supabase.auth.signOut();
-                    setToast({ tone: "neutral", message: "Signed out. Local work remains in this browser." });
-                    window.setTimeout(() => window.location.reload(), 250);
-                } catch (error) {
-                    console.error("Sign-out error:", error);
-                    setToast({ tone: "error", message: "Sign-out failed. Please try again." });
-                }
-            })();
-        });
-    }
-
     const categoryButtons = [
         {
             id: "general" as const,
             label: "General",
-            description: "Storage, sync state, account identity, and local preferences.",
+            description: "Storage mode, plan status, and local studio preferences.",
         },
         {
             id: "ai" as const,
@@ -582,22 +399,17 @@ function SettingsContent() {
         {
             id: "privacy" as const,
             label: "Privacy",
-            description: "Export data, control gallery visibility, and delete all data.",
+            description: "Export local data, review data handling, and delete all data.",
         },
         {
             id: "billing" as const,
             label: "Billing",
-            description: "Plan status, credit allowance, transaction history, and upgrades.",
+            description: "Plan, monthly credit allowance, and recent credit activity.",
         },
     ];
 
     const activeCategoryMeta = categoryButtons.find((item) => item.id === activeCategory) ?? categoryButtons[0];
-    const storageModeLabel =
-        storageStatus.mode === "synced-account"
-            ? "Synced account"
-            : storageStatus.mode === "supabase-unavailable"
-                ? "Browser-only"
-                : "Local-only";
+    const storageModeLabel = "Local-only";
 
     return (
         <div className="studio-page">
@@ -630,58 +442,28 @@ function SettingsContent() {
                     {activeCategory === "general" && (
                         <SectionCard
                             title="General"
-                            description="Manage storage behavior, account sync, and browser-scoped studio preferences."
+                            description="Manage storage, plan, and browser-scoped studio preferences."
                         >
-                            <StorageStatusCard
-                                status={storageStatus}
-                                actionHref={userEmail ? undefined : "/auth?next=%2Fsettings%3Ftab%3Dgeneral"}
-                                actionLabel="Enable account sync"
-                                variant="inset"
-                            />
-
-                            <SettingRow
-                                title="Current account"
-                                description={
-                                    userEmail
-                                        ? "This email is attached to synced workspace data, billing, and account-level settings."
-                                        : "You are currently using RoadMap Studio without an account. Work stays on this device unless you enable sync."
-                                }
-                            >
-                                {loading ? (
-                                    <div className="inline-flex items-center gap-2 text-sm text-text-secondary">
-                                        <Loader2 size={14} className="animate-spin" />
-                                        Loading account
+                            <div className="settings-field">
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <HardDrive size={18} className="text-text-secondary" />
+                                    <div>
+                                        <h3 className="text-sm font-semibold text-text-primary">Local-only storage</h3>
+                                        <p className="mt-1 text-sm leading-6 text-text-secondary">
+                                            All roadmaps and studio preferences are saved in this browser and never leave your device. Your work stays private and works offline.
+                                        </p>
                                     </div>
-                                ) : userEmail ? (
-                                    <>
-                                        <div className="inline-flex items-center gap-2 text-sm text-text-primary">
-                                            <UserRound size={14} />
-                                            {userEmail}
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleSignOut}
-                                            disabled={isSigningOut}
-                                            className="button-secondary disabled:opacity-60"
-                                        >
-                                            {isSigningOut ? <Loader2 size={14} className="animate-spin" /> : <LogOut size={14} />}
-                                            Sign out
-                                        </button>
-                                    </>
-                                ) : (
-                                    <Link
-                                        href="/auth?next=%2Fsettings%3Ftab%3Dgeneral"
-                                        className="button-primary"
-                                    >
-                                        <HardDrive size={14} />
-                                        Sign in to enable sync
-                                    </Link>
-                                )}
-                            </SettingRow>
+                                </div>
+                                <div className="mt-4 flex flex-wrap gap-3">
+                                    <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${getPlanBadgeClasses(effectivePlanId)}`}>
+                                        {getPlanName(effectivePlanId)} plan
+                                    </span>
+                                </div>
+                            </div>
 
                             <SettingRow
                                 title="Storage mode"
-                                description="Roadmaps always save locally first. When sync is enabled, the same work is mirrored to your account."
+                                description="Roadmaps are stored locally in this browser only. No account or sync is required."
                             >
                                 <span className="text-sm font-medium text-text-primary">{storageModeLabel}</span>
                             </SettingRow>
@@ -789,28 +571,15 @@ function SettingsContent() {
                                     <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${getPlanBadgeClasses(effectivePlanId)}`}>
                                         {getPlanName(effectivePlanId)}
                                     </span>
-                                    {subscription?.status && (
-                                        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${getStatusBadgeClasses(subscription.status)}`}>
-                                            {subscription.status}
-                                        </span>
-                                    )}
                                 </div>
                                 <p className="mt-4 text-sm leading-7 text-text-secondary">
-                                    {paidPlan
-                                        ? renewalDate
-                                            ? `Your current billing period renews on ${renewalDate}.`
-                                            : "Your subscription is active and account-scoped."
-                                        : "You are on the free studio tier. Upgrade when you need more monthly AI allowance or client-facing features."}
+                                    You are on the free studio tier: up to 3 workspaces and 10 shared AI generations per month. Bring your own provider key (BYOK) to skip credit deductions entirely.
                                 </p>
                                 <div className="mt-4 flex flex-wrap gap-3">
-                                    {paidPlan ? (
-                                        <ManageBillingButton />
-                                    ) : (
-                                        <Link href="/pricing" className="button-primary">
-                                            View pricing
-                                            <ArrowUpRight size={14} />
-                                        </Link>
-                                    )}
+                                    <Link href="/pricing" className="button-primary">
+                                        View pricing
+                                        <ArrowUpRight size={14} />
+                                    </Link>
                                     <Link href="/pricing" className="button-secondary">
                                         Compare plans
                                         <ExternalLink size={14} />
@@ -823,9 +592,7 @@ function SettingsContent() {
                                 <p className="mt-1 text-sm leading-6 text-text-secondary">
                                     {creditStatus
                                         ? `${creditStatus.remaining} remaining. ${creditStatus.used} used out of ${creditStatus.allowance}. Resets ${formatDate(creditStatus.resetDate)}.`
-                                        : userEmail
-                                            ? "Loading current credit allowance."
-                                            : "Sign in to track studio-managed monthly credits. BYOK can bypass credits entirely."}
+                                        : "Loading current credit allowance."}
                                 </p>
                                 {creditStatus && (
                                     <div className="mt-4 h-3 overflow-hidden rounded-full bg-border/70">
@@ -841,13 +608,11 @@ function SettingsContent() {
                                 <div className="flex items-center justify-between gap-4">
                                     <div>
                                         <h3 className="text-sm font-semibold text-text-primary">Recent transactions</h3>
-                                        <p className="mt-1 text-sm leading-6 text-text-secondary">Latest credit activity for this account.</p>
+                                        <p className="mt-1 text-sm leading-6 text-text-secondary">Latest credit activity for this device.</p>
                                     </div>
-                                    {userEmail && (
-                                        <button type="button" onClick={() => void refreshRemoteSettings()} className="button-secondary">
-                                            Refresh
-                                        </button>
-                                    )}
+                                    <button type="button" onClick={() => void refreshRemoteSettings()} className="button-secondary">
+                                        Refresh
+                                    </button>
                                 </div>
 
                                 <div className="mt-4 space-y-3">
@@ -870,9 +635,7 @@ function SettingsContent() {
                                         ))
                                     ) : (
                                         <div className="rounded-[18px] border border-dashed border-border px-4 py-6 text-sm leading-7 text-text-secondary">
-                                            {userEmail
-                                                ? "No credit transactions yet. Generated work, quizzes, and reviews will appear here."
-                                                : "Sign in to store and view credit history on your account."}
+                                            No credit transactions yet. Generated work, quizzes, and reviews will appear here.
                                         </div>
                                     )}
                                 </div>
@@ -883,37 +646,11 @@ function SettingsContent() {
                     {activeCategory === "privacy" && (
                         <SectionCard
                             title="Privacy"
-                            description="Control analytics, gallery visibility, exports, and destructive actions."
+                            description="Export local data and manage destructive actions."
                         >
                             <SettingRow
-                                title="Anonymous analytics"
-                                description="Allow product analytics that help improve the studio without exposing your work publicly."
-                            >
-                                <Toggle
-                                    checked={privacyDraft.anonymousAnalytics}
-                                    disabled={!userEmail || privacySaving}
-                                    onChange={(next) => setPrivacyDraft((current) => ({ ...current, anonymousAnalytics: next }))}
-                                />
-                            </SettingRow>
-
-                            <SettingRow
-                                title="Allow public gallery participation"
-                                description="When disabled, your account will no longer expose shareable gallery entries."
-                            >
-                                <Toggle
-                                    checked={privacyDraft.allowPublicGallery}
-                                    disabled={!userEmail || privacySaving}
-                                    onChange={(next) => setPrivacyDraft((current) => ({ ...current, allowPublicGallery: next }))}
-                                />
-                            </SettingRow>
-
-                            <SettingRow
                                 title="Export your data"
-                                description={
-                                    userEmail
-                                        ? "Download account-scoped roadmaps, privacy settings, analytics, and related studio records in one JSON export."
-                                        : "Download the roadmaps and local studio preferences stored in this browser."
-                                }
+                                description="Download the roadmaps and local studio preferences stored in this browser."
                             >
                                 <button
                                     type="button"
@@ -930,26 +667,9 @@ function SettingsContent() {
                                 <div>
                                     <h3 className="text-sm font-semibold text-red-700">Danger zone</h3>
                                     <p className="mt-1 text-sm leading-6 text-text-secondary">
-                                    {userEmail
-                                        ? "This removes account-scoped roadmaps, notes, privacy settings, analytics history, coaching sessions, credit records, and local browser copies on this device. Your auth account remains."
-                                        : "This clears all roadmaps and studio preferences from this browser only."}
+                                        This clears all roadmaps, credit history, and studio preferences from this browser only. Other devices and browsers are not affected.
                                     </p>
                                 </div>
-
-                                {deleteRequiresConfirmation && (
-                                    <div className="mt-5 max-w-sm">
-                                        <label className="block text-xs font-semibold uppercase tracking-[0.18em] text-text-secondary" htmlFor="delete-confirmation">
-                                            Type DELETE to confirm
-                                        </label>
-                                        <Input
-                                            id="delete-confirmation"
-                                            value={deleteConfirmation}
-                                            onChange={(event) => setDeleteConfirmation(event.target.value)}
-                                            className="mt-2 border-red-200 bg-white"
-                                            placeholder="DELETE"
-                                        />
-                                    </div>
-                                )}
 
                                 <div className="mt-6">
                                     <Button
@@ -962,13 +682,6 @@ function SettingsContent() {
                                         Delete all data
                                     </Button>
                                 </div>
-                            </div>
-
-                            <div className="settings-action-row">
-                                <Button type="button" onClick={() => void handleSavePrivacy()} disabled={!userEmail || privacySaving}>
-                                    {privacySaving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
-                                    Save changes
-                                </Button>
                             </div>
                         </SectionCard>
                     )}

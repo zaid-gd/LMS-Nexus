@@ -2,54 +2,19 @@ import type { AIProvider } from "@/lib/ai-config";
 import type { CoachingSession, ProgressSnapshot } from "@/types";
 import { buildVelocitySeries, computeOverview } from "@/lib/analytics";
 import { generateStructuredJson } from "@/lib/server/ai";
-import { requireServerUser } from "@/lib/server/auth";
 import { deductCredits } from "@/lib/server/credits";
+import { listStoredCoachingSessions, listStoredProgressSnapshots, pushStoredCoachingSession } from "@/lib/server/store";
 import { listUserWorkspaces } from "@/lib/server/workspaces";
 
 export async function getDashboardOverview() {
-    const { supabase, user } = await requireServerUser();
     const roadmaps = await listUserWorkspaces();
-    const { data: snapshots, error } = await supabase
-        .from("progress_snapshots")
-        .select("id, roadmap_id, section_id, completion_rate, completed_tasks, total_tasks, created_at")
-        .eq("user_id", user.id);
-
-    if (error) throw error;
-
-    const normalizedSnapshots: ProgressSnapshot[] = (snapshots ?? []).map((row) => ({
-        id: row.id,
-        roadmapId: row.roadmap_id,
-        sectionId: row.section_id,
-        completionRate: row.completion_rate,
-        completedTasks: row.completed_tasks,
-        totalTasks: row.total_tasks,
-        createdAt: row.created_at,
-    }));
-
-    return computeOverview(roadmaps, normalizedSnapshots);
+    const snapshots: ProgressSnapshot[] = listStoredProgressSnapshots();
+    return computeOverview(roadmaps, snapshots);
 }
 
 export async function getDashboardVelocity() {
-    const { supabase, user } = await requireServerUser();
-    const { data, error } = await supabase
-        .from("progress_snapshots")
-        .select("id, roadmap_id, section_id, completion_rate, completed_tasks, total_tasks, created_at")
-        .eq("user_id", user.id)
-        .gte("created_at", new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString())
-        .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    const snapshots: ProgressSnapshot[] = (data ?? []).map((row) => ({
-        id: row.id,
-        roadmapId: row.roadmap_id,
-        sectionId: row.section_id,
-        completionRate: row.completion_rate,
-        completedTasks: row.completed_tasks,
-        totalTasks: row.total_tasks,
-        createdAt: row.created_at,
-    }));
-
+    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+    const snapshots: ProgressSnapshot[] = listStoredProgressSnapshots(since);
     return buildVelocitySeries(snapshots);
 }
 
@@ -60,30 +25,17 @@ export async function saveCoachingSession(input: {
     topics: string[];
     nextSteps: string;
 }) {
-    const { supabase, user } = await requireServerUser();
-    const { data, error } = await supabase
-        .from("coaching_sessions")
-        .insert({
-            user_id: user.id,
-            roadmap_id: input.roadmapId,
-            date: input.date,
-            duration_minutes: input.durationMinutes,
-            topics: input.topics,
-            next_steps: input.nextSteps,
-        })
-        .select("id, roadmap_id, date, duration_minutes, topics, next_steps")
-        .single();
+    const session: CoachingSession = {
+        id: `cs_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+        roadmapId: input.roadmapId,
+        date: input.date,
+        durationMinutes: input.durationMinutes,
+        topics: input.topics,
+        nextSteps: input.nextSteps,
+    };
 
-    if (error) throw error;
-
-    return {
-        id: data.id,
-        roadmapId: data.roadmap_id,
-        date: data.date,
-        durationMinutes: data.duration_minutes,
-        topics: Array.isArray(data.topics) ? data.topics : [],
-        nextSteps: data.next_steps,
-    } satisfies CoachingSession;
+    pushStoredCoachingSession(session);
+    return session;
 }
 
 export async function generateNinetyDayReview(input: {
@@ -92,22 +44,13 @@ export async function generateNinetyDayReview(input: {
     userModel?: string;
     userProvider?: AIProvider;
 }) {
-    const { supabase, user } = await requireServerUser();
     const roadmaps = await listUserWorkspaces();
     const roadmap = roadmaps.find((candidate) => candidate.id === input.roadmapId);
     if (!roadmap) {
         throw new Error("Roadmap not found");
     }
 
-    const { data: sessions, error } = await supabase
-        .from("coaching_sessions")
-        .select("date, duration_minutes, topics, next_steps")
-        .eq("user_id", user.id)
-        .eq("roadmap_id", roadmap.id)
-        .order("date", { ascending: false })
-        .limit(12);
-
-    if (error) throw error;
+    const sessions = listStoredCoachingSessions(roadmap.id).slice(0, 12);
 
     const creditResult = await deductCredits({
         kind: "review",

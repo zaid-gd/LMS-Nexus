@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Code, Copy, Download, ExternalLink, Globe2, Loader2, Lock, X } from "lucide-react";
-import type { Roadmap, StorageStatus } from "@/types";
-import { getStorageStatus } from "@/lib/storage";
+import type { Roadmap } from "@/types";
 
 interface ShareEmbedModalProps {
     roadmap: Roadmap;
@@ -12,34 +11,12 @@ interface ShareEmbedModalProps {
     onUpdateRoadmap?: (updates: Partial<Roadmap>) => void;
 }
 
-const DEFAULT_STORAGE_STATUS: StorageStatus = {
-    mode: "local-only",
-    cloudAvailable: false,
-    email: null,
-};
-
 export default function ShareEmbedModal({ roadmap, isOpen, onClose, onUpdateRoadmap }: ShareEmbedModalProps) {
     const [activeTab, setActiveTab] = useState<"share" | "embed" | "export">("share");
     const [copiedLink, setCopiedLink] = useState(false);
     const [copiedEmbed, setCopiedEmbed] = useState(false);
-    const [storageStatus, setStorageStatus] = useState<StorageStatus>(DEFAULT_STORAGE_STATUS);
     const [isPublishing, setIsPublishing] = useState(false);
     const [publishMessage, setPublishMessage] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (!isOpen) return;
-
-        let active = true;
-        void getStorageStatus().then((status) => {
-            if (active) {
-                setStorageStatus(status);
-            }
-        });
-
-        return () => {
-            active = false;
-        };
-    }, [isOpen]);
     const shareUrl = useMemo(
         () => (typeof window !== "undefined" ? `${window.location.origin}/share/${roadmap.id}` : ""),
         [roadmap.id],
@@ -49,7 +26,7 @@ export default function ShareEmbedModal({ roadmap, isOpen, onClose, onUpdateRoad
         [roadmap.id],
     );
     const embedCode = `<iframe src="${embedUrl}" width="100%" height="800px" frameborder="0"></iframe>`;
-    const isSyncedAccount = storageStatus.mode === "synced-account";
+    const isSyncedAccount = false;
     const isShareable = Boolean(roadmap.isPublic);
 
     if (!isOpen) return null;
@@ -88,7 +65,7 @@ export default function ShareEmbedModal({ roadmap, isOpen, onClose, onUpdateRoad
 
     const handleVisibilityChange = async (nextVisibility: boolean) => {
         if (!isSyncedAccount) {
-            setPublishMessage("Sign in and sync this workspace before publishing a share link.");
+            setPublishMessage("Share links require a synced account. The studio is local-only, so publishing is not available.");
             return;
         }
 
@@ -188,7 +165,7 @@ export default function ShareEmbedModal({ roadmap, isOpen, onClose, onUpdateRoad
                                                 <p>
                                                     {isSyncedAccount
                                                         ? "This workspace is still private. Publish it once, then the share link and embed preview will become available."
-                                                        : "Share links are only available for synced account workspaces. Sign in first, then publish the workspace."}
+                                                        : "Share links require a synced account. The studio is local-only, so publishing is not available."}
                                                 </p>
                                                 {isSyncedAccount ? (
                                                     <button

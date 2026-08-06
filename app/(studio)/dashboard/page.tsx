@@ -19,14 +19,6 @@ export default function DashboardPage() {
         setMounted(true);
         setRoadmaps(storage.getRoadmaps());
 
-        if (storage.syncFromCloud) {
-            void storage.syncFromCloud().then((synced) => {
-                if (active) {
-                    setRoadmaps(synced);
-                }
-            });
-        }
-
         return () => {
             active = false;
         };
