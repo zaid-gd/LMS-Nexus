@@ -355,7 +355,7 @@ function SettingsContent() {
                 exportedAt: new Date().toISOString(),
                 storageMode: storageStatus.mode,
                 config,
-                roadmaps: JSON.parse(getRoadmapsBackupJson() || "[]"),
+                workspaceState: JSON.parse(getRoadmapsBackupJson()),
             });
             setToast({ tone: "success", message: "Local browser export downloaded." });
         } catch (error) {

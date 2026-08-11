@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
+import { unlockLearningBadge } from '@/lib/learning-session';
+import { getWorkspacePersistence } from '@/lib/workspace-persistence';
 
 export type BadgeType = 
   | 'first_step'
@@ -27,29 +29,22 @@ export const BADGES_CONFIG: Record<BadgeType, Omit<Badge, 'id' | 'unlockedAt'>> 
   explorer: { title: 'Explorer', description: 'Create 3 or more workspaces', icon: '🗺️' },
 };
 
-const ACHIEVEMENTS_STORAGE_KEY = 'zns_achievements';
-
 export function useAchievements() {
   const [unlockedBadges, setUnlockedBadges] = useState<Record<string, number>>({});
   const [recentBadge, setRecentBadge] = useState<Badge | null>(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem(ACHIEVEMENTS_STORAGE_KEY);
-    if (stored) {
-      try {
-        setUnlockedBadges(JSON.parse(stored));
-      } catch (e) {
-        console.error('Failed to parse achievements', e);
-      }
-    }
+    setUnlockedBadges(getWorkspacePersistence().getLearningRecord().unlockedBadges);
   }, []);
 
   const unlockBadge = useCallback((badgeId: BadgeType) => {
     setUnlockedBadges((prev) => {
       if (prev[badgeId]) return prev;
       
-      const updated = { ...prev, [badgeId]: Date.now() };
-      localStorage.setItem(ACHIEVEMENTS_STORAGE_KEY, JSON.stringify(updated));
+      const persistence = getWorkspacePersistence();
+      const record = unlockLearningBadge(persistence.getLearningRecord(), badgeId);
+      const updated = record.unlockedBadges;
+      persistence.saveLearningRecord(record);
       
       const badgeToToast: Badge = { id: badgeId, ...BADGES_CONFIG[badgeId], unlockedAt: updated[badgeId] };
       setRecentBadge(badgeToToast);

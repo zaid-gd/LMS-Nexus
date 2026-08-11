@@ -10,27 +10,7 @@ export function useRoadmap(id?: string, isSession: boolean = false) {
     // Lazy state initialization (vercel best practice: 5.10)
     const [roadmap, setRoadmap] = useState<Roadmap | null>(() => {
         if (typeof window === "undefined" || !id) return null;
-        const base = storage.getRoadmap(id);
-        
-        if (base && isSession) {
-            // Merge session data (progress tracking only)
-            const sessionData = localStorage.getItem(`zns:v1:session:${id}`);
-            if (sessionData) {
-                try {
-                    const sessionSections = JSON.parse(sessionData);
-                    return {
-                        ...base,
-                        sections: base.sections.map(s => {
-                            const sessionSection = sessionSections.find((ss: Section) => ss.id === s.id);
-                            return sessionSection ? { ...s, data: sessionSection.data } : s;
-                        })
-                    };
-                } catch (e) {
-                    return base;
-                }
-            }
-        }
-        return base;
+        return storage.getWorkspace(id, isSession);
     });
 
     const [roadmaps, setRoadmaps] = useState<Roadmap[]>(() => {
@@ -79,7 +59,7 @@ export function useRoadmap(id?: string, isSession: boolean = false) {
 
                 if (isSession) {
                     // Only save progress to session store
-                    localStorage.setItem(`zns:v1:session:${id}`, JSON.stringify(updated.sections));
+                    if (id) storage.saveSession(id, updated.sections);
                 } else {
                     storage.saveRoadmap(updated);
                 }
@@ -92,24 +72,7 @@ export function useRoadmap(id?: string, isSession: boolean = false) {
     // Sync on mount if id changes
     useEffect(() => {
         if (id) {
-            const base = storage.getRoadmap(id);
-            if (base && isSession) {
-                const sessionData = localStorage.getItem(`zns:v1:session:${id}`);
-                if (sessionData) {
-                    try {
-                        const sessionSections = JSON.parse(sessionData);
-                        setRoadmap({
-                            ...base,
-                            sections: base.sections.map(s => {
-                                const sessionSection = sessionSections.find((ss: Section) => ss.id === s.id);
-                                return sessionSection ? { ...s, data: sessionSection.data } : s;
-                            })
-                        });
-                        return;
-                    } catch (e) {}
-                }
-            }
-            setRoadmap(base);
+            setRoadmap(storage.getWorkspace(id, isSession));
         }
     }, [id, isSession, storage]);
 

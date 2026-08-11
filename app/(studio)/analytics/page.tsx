@@ -64,19 +64,10 @@ function buildConsistencyGrid(roadmaps: Roadmap[]): DayCell[] {
         }
     }
 
-    // Also pull from local streak storage for per-day task counts
-    try {
-        const streakRaw = typeof window !== "undefined" ? localStorage.getItem("zns_learning_streak") : null;
-        if (streakRaw) {
-            const streakData = JSON.parse(streakRaw);
-            if (streakData.lastActivityDate && streakData.tasksCompletedToday > 0) {
-                const d = streakData.lastActivityDate;
-                if (d >= startStr && d <= todayStr) {
-                    counts[d] = (counts[d] || 0) + streakData.tasksCompletedToday;
-                }
-            }
-        }
-    } catch { /* ignore */ }
+    const learning = getStorage().getLearningRecord();
+    for (const [date, count] of Object.entries(learning.tasksByDate)) {
+        if (date >= startStr && date <= todayStr) counts[date] = (counts[date] || 0) + count;
+    }
 
     // Build the full 364-day array
     const cells: DayCell[] = [];
@@ -279,15 +270,10 @@ export default function AnalyticsPage() {
         setMounted(true);
         setRoadmaps(storage.getRoadmaps());
 
-        // Load streak
-        try {
-            const raw = localStorage.getItem("zns_learning_streak");
-            if (raw) {
-                const data = JSON.parse(raw);
-                setStreak(data.currentStreak || 0);
-                setTasksToday(data.tasksCompletedToday || 0);
-            }
-        } catch { /* ignore */ }
+        const learning = storage.getLearningRecord();
+        const todayKey = new Date().toLocaleDateString("en-CA");
+        setStreak(learning.currentStreak);
+        setTasksToday(learning.tasksByDate[todayKey] ?? 0);
     }, []);
 
     const cells = useMemo(() => (mounted ? buildConsistencyGrid(roadmaps) : []), [mounted, roadmaps]);

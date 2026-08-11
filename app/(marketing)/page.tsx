@@ -175,11 +175,11 @@ function SectionCapture() {
                         <div className="p-6 font-mono text-sm leading-relaxed text-zinc-300">
                             <span className="text-emerald-400"># Team Operating Notes</span>
                             <br /><br />
-                            <span className="text-zinc-500">// Week 1</span><br />
+                            <span className="text-zinc-500">{"// Week 1"}</span><br />
                             <span className="text-zinc-300">- Setup, access, workspace conventions</span><br />
                             <span className="text-zinc-300">- Initial system tour</span><br />
                             <br />
-                            <span className="text-zinc-500">// Week 2</span><br />
+                            <span className="text-zinc-500">{"// Week 2"}</span><br />
                             <span className="text-zinc-300">- Ownership patterns</span><br />
                             <span className="text-zinc-300">- Review rhythms and handoff rules</span><br />
                             <br />

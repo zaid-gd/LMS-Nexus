@@ -31,6 +31,7 @@ import { Search, Settings, Home, ArrowRight, CheckCircle2, Circle, LayoutDashboa
 import { useRouter } from "next/navigation";
 import { exportAsMarkdown, exportAsJSON, exportAsPDF } from "@/lib/export";
 import { saveVersion, getVersions } from "@/lib/versioning";
+import { getWorkspacePersistence } from "@/lib/workspace-persistence";
 import { getUserConfig } from "@/lib/userConfig";
 import { getStorage } from "@/lib/storage";
 import { seedSrsItems } from "@/lib/srs";
@@ -58,7 +59,7 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
     const [userConfig, setUserConfig] = useState<any>(null);
     const [srsItems, setSrsItems] = useState<SrsItem[]>([]);
     const [isSrsModalOpen, setIsSrsModalOpen] = useState(false);
-    const srsStorageKey = useMemo(() => `zns:v1:srs:${roadmap.id}`, [roadmap.id]);
+    const persistence = getWorkspacePersistence();
 
     useEffect(() => {
         setUserConfig(getUserConfig());
@@ -68,14 +69,7 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
         if (typeof window === "undefined") return;
 
         const seededItems = seedSrsItems(roadmap);
-        let storedItems: SrsItem[] = [];
-
-        try {
-            const stored = localStorage.getItem(srsStorageKey);
-            storedItems = stored ? JSON.parse(stored) as SrsItem[] : [];
-        } catch {
-            storedItems = [];
-        }
+        const storedItems = persistence.getReviews(roadmap.id);
 
         const mergedItems = new Map(seededItems.map((item) => [item.id, item]));
         storedItems.forEach((item) => {
@@ -83,9 +77,9 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
         });
 
         const nextItems = Array.from(mergedItems.values());
-        localStorage.setItem(srsStorageKey, JSON.stringify(nextItems));
+        persistence.saveReviews(roadmap.id, nextItems);
         setSrsItems(nextItems);
-    }, [roadmap, srsStorageKey]);
+    }, [persistence, roadmap]);
 
     // Tour State
     const [tourStep, setTourStep] = useState(-1);
@@ -285,9 +279,9 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
                 anyModuleCompleted = true;
 
                 // Track start time for Speed Learner
-                const startTimeStr = localStorage.getItem(`zns_mod_start_${mod.id}`);
-                if (startTimeStr) {
-                    const startTime = parseInt(startTimeStr, 10);
+                const learningRecord = persistence.getLearningRecord();
+                const startTime = learningRecord.moduleStartedAt[mod.id];
+                if (startTime) {
                     const hoursPassed = (Date.now() - startTime) / (1000 * 60 * 60);
                     if (hoursPassed < 24) {
                         unlockBadge("speed_learner");
@@ -295,8 +289,9 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
                 }
             } else if (!isCompleted && !wasCompleted && getModuleProgress(mod) > 0) {
                 // Record start time if not recorded
-                if (!localStorage.getItem(`zns_mod_start_${mod.id}`)) {
-                    localStorage.setItem(`zns_mod_start_${mod.id}`, Date.now().toString());
+                const learningRecord = persistence.getLearningRecord();
+                if (!learningRecord.moduleStartedAt[mod.id]) {
+                    persistence.saveLearningRecord({ ...learningRecord, moduleStartedAt: { ...learningRecord.moduleStartedAt, [mod.id]: Date.now() } });
                 }
             }
 
@@ -312,7 +307,7 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
             unlockBadge("course_complete");
         }
 
-    }, [progress, currentStreak, logActivity, moduleSections, unlockBadge]);
+    }, [progress, currentStreak, logActivity, moduleSections, persistence, unlockBadge]);
 
     // Resource tracking for Deep Diver
     useEffect(() => {
@@ -506,7 +501,7 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
 
         setSrsItems((current) => {
             const merged = current.map((item) => reviewedLookup.get(item.id) ?? item);
-            localStorage.setItem(srsStorageKey, JSON.stringify(merged));
+            persistence.saveReviews(roadmap.id, merged);
             return merged;
         });
 
@@ -519,7 +514,7 @@ export default function WorkspaceShell({ roadmap, onUpdateSection, onUpdateRoadm
         } catch {
             // Signed-out users stay local-first; sync failure is non-blocking here.
         }
-    }, [srsStorageKey]);
+    }, [persistence, roadmap.id]);
 
     const getUtilityIcon = (type: string) => {
         if (type === "milestones") return <Target size={16} aria-hidden="true" />;

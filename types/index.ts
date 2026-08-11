@@ -321,16 +321,6 @@ export interface PublicRoadmapCard {
     isSeed?: boolean;
 }
 
-/* Storage interface */
-export interface StorageProvider {
-    getRoadmaps(): Roadmap[];
-    getRoadmap(id: string): Roadmap | null;
-    saveRoadmap(roadmap: Roadmap): void;
-    deleteRoadmap(id: string): void;
-    updateRoadmap(id: string, updates: Partial<Roadmap>): void;
-    clearRoadmaps(): void;
-}
-
 /* API types */
 export interface ParseRoadmapRequest {
     content: string;

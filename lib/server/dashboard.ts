@@ -1,22 +1,9 @@
 import type { AIProvider } from "@/lib/ai-config";
-import type { CoachingSession, ProgressSnapshot } from "@/types";
-import { buildVelocitySeries, computeOverview } from "@/lib/analytics";
+import type { CoachingSession } from "@/types";
 import { generateStructuredJson } from "@/lib/server/ai";
 import { deductCredits } from "@/lib/server/credits";
-import { listStoredCoachingSessions, listStoredProgressSnapshots, pushStoredCoachingSession } from "@/lib/server/store";
+import { listStoredCoachingSessions, pushStoredCoachingSession } from "@/lib/server/store";
 import { listUserWorkspaces } from "@/lib/server/workspaces";
-
-export async function getDashboardOverview() {
-    const roadmaps = await listUserWorkspaces();
-    const snapshots: ProgressSnapshot[] = listStoredProgressSnapshots();
-    return computeOverview(roadmaps, snapshots);
-}
-
-export async function getDashboardVelocity() {
-    const since = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-    const snapshots: ProgressSnapshot[] = listStoredProgressSnapshots(since);
-    return buildVelocitySeries(snapshots);
-}
 
 export async function saveCoachingSession(input: {
     roadmapId: string;

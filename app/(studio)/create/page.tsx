@@ -157,7 +157,7 @@ function CreatePageContent() {
                             Turn scattered notes into a roadmap.
                         </h1>
                         <p className="mt-4 max-w-2xl text-sm leading-7 text-text-secondary">
-                            Drop in your guides, PDFs (as text for now), or markdown. We'll extract the steps and modules.
+                            Drop in your guides, PDFs (as text for now), or markdown. We&apos;ll extract the steps and modules.
                         </p>
                     </section>
                 )}

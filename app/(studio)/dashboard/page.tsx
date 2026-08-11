@@ -11,6 +11,7 @@ import type { Roadmap } from "@/types";
 export default function DashboardPage() {
     const [roadmaps, setRoadmaps] = useState<Roadmap[]>([]);
     const [mounted, setMounted] = useState(false);
+    const [currentStreak, setCurrentStreak] = useState(0);
 
     useEffect(() => {
         const storage = getStorage();
@@ -18,6 +19,7 @@ export default function DashboardPage() {
 
         setMounted(true);
         setRoadmaps(storage.getRoadmaps());
+        setCurrentStreak(storage.getLearningRecord().currentStreak);
 
         return () => {
             active = false;
@@ -31,16 +33,13 @@ export default function DashboardPage() {
             .slice(0, 3);
     }, [roadmaps]);
 
-    // Simple streak mock logic 
-    const currentStreak = 4;
-
     return (
         <div className="studio-page">
             <header className="app-header-block flex items-start justify-between gap-4">
                 <div>
                     <p className="eyebrow text-emerald-500">Dashboard</p>
                     <h1 className="mt-3 text-4xl font-display leading-none text-zinc-100 tracking-tight md:text-5xl">
-                        Today's Focus
+                        Today&apos;s Focus
                     </h1>
                     <p className="mt-4 text-sm leading-7 text-zinc-400 max-w-xl">
                         Jump back into your active workspaces and keep your learning streak alive.
